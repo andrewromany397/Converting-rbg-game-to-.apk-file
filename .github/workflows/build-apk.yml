@@ -2,48 +2,46 @@ name: Build Python APK
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:  # Allow manual trigger
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:        # allow manual trigger
 
 jobs:
   build-apk:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout repository
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # 2. Install system dependencies for Buildozer
-      - name: Install dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y \
-            python3 python3-pip python3-setuptools python3-wheel \
-            git zip unzip openjdk-17-jdk \
-            libffi-dev libssl-dev \
-            libsqlite3-dev zlib1g-dev \
-            libjpeg-dev libfreetype6-dev \
-            libblas-dev liblapack-dev \
-            pkg-config autoconf automake libtool \
-            build-essential
-
-      # 3. Install Buildozer
-      - name: Install Buildozer
-        run: |
-          pip3 install --upgrade pip
-          pip3 install buildozer cython
-
-      # 4. Build the APK
-      - name: Build APK
-        run: |
-          buildozer init || true  # Create buildozer.spec if not exists
-          buildozer -v android debug
-
-      # 5. Upload APK as artifact
-      - name: Upload APK
-        uses: actions/upload-artifact@v3
+      # Cache Buildozer's global build directory to speed up subsequent builds
+      - name: Cache Buildozer build directory
+        uses: actions/cache@v4
         with:
-          name: python-app-apk
+          path: ~/.buildozer
+          key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-buildozer-
+
+      # Use the official Buildozer Docker image (includes Android SDK, NDK, etc.)
+      - name: Build APK with Buildozer
+        uses: docker://kivy/buildozer:latest
+        with:
+          args: |
+            bash -c "
+              # Create a default buildozer.spec if it doesn't exist
+              if [ ! -f buildozer.spec ]; then
+                buildozer init
+              fi
+              # Build debug APK
+              buildozer android debug
+            "
+
+      # Upload the resulting APK as an artifact
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-app-debug
           path: bin/*.apk
+          if-no-files-found: error
