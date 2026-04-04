@@ -1,46 +1,41 @@
-name: Build Python APK
+name: Build Python APK (No Deprecated Actions)
 
 on:
   push:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:        # allow manual trigger
+  workflow_dispatch:
 
 jobs:
   build-apk:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4     # ✅ latest non‑deprecated
 
-      # Cache Buildozer's global build directory to speed up subsequent builds
-      - name: Cache Buildozer build directory
-        uses: actions/cache@v4
+      - name: Cache Buildozer global files
+        uses: actions/cache@v4        # ✅ latest
         with:
           path: ~/.buildozer
           key: ${{ runner.os }}-buildozer-${{ hashFiles('buildozer.spec', 'requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-buildozer-
 
-      # Use the official Buildozer Docker image (includes Android SDK, NDK, etc.)
-      - name: Build APK with Buildozer
+      - name: Build APK using Buildozer Docker image
         uses: docker://kivy/buildozer:latest
         with:
           args: |
             bash -c "
-              # Create a default buildozer.spec if it doesn't exist
               if [ ! -f buildozer.spec ]; then
                 buildozer init
               fi
-              # Build debug APK
               buildozer android debug
             "
 
-      # Upload the resulting APK as an artifact
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4   # ✅ v4 – no deprecation
         with:
           name: python-app-debug
           path: bin/*.apk
